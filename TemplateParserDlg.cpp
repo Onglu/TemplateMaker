@@ -15,6 +15,8 @@
 
 using namespace QtJson;
 
+QProcess TemplateParserDlg::m_tmaker;
+
 TemplateParserDlg::TemplateParserDlg(QWidget *parent) :
     QDialog(parent, Qt::WindowMinimizeButtonHint | Qt::WindowMaximizeButtonHint),
     ui(new Ui::TemplateParserDlg),
@@ -22,7 +24,8 @@ TemplateParserDlg::TemplateParserDlg(QWidget *parent) :
     m_finished(false),
     m_landscapeCount(0),
     m_portraitCount(0),
-    m_make(false)
+    m_make(false),
+    m_usage(ZipUsageCompress)
 {
     ui->setupUi(this);
 
@@ -54,6 +57,13 @@ TemplateParserDlg::~TemplateParserDlg()
     psd_release(m_pInfo);
 
     deleteDir(m_tmpDir);
+
+    if (QFile::exists(m_tmpFile))
+    {
+        QFile::remove(m_tmpFile);
+    }
+
+    m_tmpFile.clear();
 
     delete ui;
 }
@@ -154,20 +164,13 @@ inline void TemplateParserDlg::change()
 {
     if (!m_make)
     {
-        //useZip(ZipUsageAppend, m_pkgFile + " " + m_tmpFile);
-        QString program(MAKER_NAME);
-        program += QString(" -a ") + m_pkgFile + " " + m_tmpFile;
-        QProcess::execute(program);
+        useZip(ZipUsageAppend, m_pkgFile + " " + m_tmpFile, true);
+        if (QFile::exists(m_tmpFile))
+        {
+            QFile::remove(m_tmpFile);
+        }
+        m_tmpFile.clear();
     }
-
-    if (QFile::exists(m_tmpFile))
-    {
-        QFile::remove(m_tmpFile);
-    }
-
-    m_tmpFile.clear();
-
-    //m_pkgFile = QString("G:\\Images\\PSD\\MP_C_P2_201306091748_777.xcmb");
 
     m_finished = false;
     m_make = !m_make;
@@ -176,7 +179,45 @@ inline void TemplateParserDlg::change()
     ui->progressBar->setValue(0);
     m_maker.crypt(m_make, m_pkgFile + " " + PKG_PASSWORD);
     m_maker.start();
-    m_timer.start(30);
+    m_timer.start(m_make ? 30 : 50);
+}
+
+void TemplateParserDlg::make()
+{
+    if (!m_finished)
+    {
+        m_finished = true;
+        qDebug() << __FILE__ << __LINE__ << m_make;
+
+        if (!m_make && m_xcmb.size())
+        {
+            //m_timer.stop();
+            //ui->progressBar->setValue(ui->progressBar->maximum());
+            //change();
+
+            useZip(ZipUsageAppend, m_pkgFile + " " + m_tmpFile, true);
+            useZip(ZipUsageEncrypt, m_pkgFile + " " + PKG_PASSWORD, true);
+
+            //qDebug() << __FILE__ << __LINE__ << program;
+
+            if (QFile::exists(m_tmpFile))
+            {
+                QFile::remove(m_tmpFile);
+            }
+
+            m_tmpFile.clear();
+        }
+    }
+}
+
+void CryptThread::run()
+{
+    TemplateParserDlg::useZip(m_encrypt ? TemplateParserDlg::ZipUsageEncrypt : TemplateParserDlg::ZipUsageDecrypt,
+                              m_arg,
+                              true);
+    emit finished();
+    //wait();
+    exit();
 }
 
 void TemplateParserDlg::processFinished(int ret, QProcess::ExitStatus exitStatus)
@@ -298,7 +339,7 @@ void TemplateParserDlg::on_psdToolButton_clicked()
         ui->progressBar->setVisible(true);
         ui->progressBar->setValue(0);
 
-        m_finished = false;
+        m_finished = m_make = false;
         m_parser.initLayersInfo(m_pInfo);
         m_parser.start();
         m_timer.start(60);
@@ -319,8 +360,13 @@ void TemplateParserDlg::on_tmplToolButton_clicked()
         return;
     }
 
+    ui->psdToolButton->setEnabled(false);
+    ui->tmplToolButton->setEnabled(false);
+
     m_make = true;
-    m_pkgFile = fileName;
+    m_pkgFile = QDir::toNativeSeparators(fileName);
+    m_xcmb.clear();
+
     change();
 }
 
@@ -354,7 +400,7 @@ void TemplateParserDlg::end()
         if (m > ++v)
         {
             ui->progressBar->setValue(v);
-            QString pro = m_parser.isRunning() || !m_make ? tr("解析进度：") : tr("生成进度：");
+            QString pro = m_parser.isRunning() ? tr("解析进度：") : tr("生成进度：");
             ui->progressBar->setFormat(tr("%1%2%").arg(pro).arg(100 * v / m));
         }
     }
@@ -678,6 +724,8 @@ void TemplateParserDlg::on_savePushButton_clicked()
 
     QString pkgFile = QString("%1%2%3").arg(m_dirName).arg(tmplName).arg(PKG_FMT);
     QFile file(pkgFile);
+    qDebug() << __FILE__ << __LINE__ << m_dirName << tmplName << m_pkgFile << pkgFile;
+
     if (file.exists())
     {
         QMessageBox::warning(this,
@@ -687,11 +735,12 @@ void TemplateParserDlg::on_savePushButton_clicked()
         return;
     }
 
-    //qDebug() << __FILE__ << __LINE__ << m_dirName << tmplName << m_pkgFile << pkgFile;
+    m_pkgFile = QDir::toNativeSeparators(m_pkgFile);
     moveTo(m_psdPic, m_dirName);
     moveTo(m_pkgFile, m_dirName);
     QFile::rename(m_pkgFile, pkgFile);
     m_pkgFile = pkgFile;
+    qDebug() << __FILE__ << __LINE__ << m_pkgFile;
 #endif
 
     change();
@@ -700,17 +749,16 @@ void TemplateParserDlg::on_savePushButton_clicked()
     //ui->savePushButton->setEnabled(false);
 }
 
-inline void TemplateParserDlg::useZip(ZipUsage usage, const QString &arguments)
+void TemplateParserDlg::useZip(ZipUsage usage, const QString &arguments, bool block)
 {
-#if 1
     if (arguments.isEmpty())
     {
         return;
     }
 
-    QString program("tmaker.exe");
+    QString program(MAKER_NAME);
 
-    m_usage = usage;
+    //m_usage = usage;
 
     switch (usage)
     {
@@ -743,8 +791,16 @@ inline void TemplateParserDlg::useZip(ZipUsage usage, const QString &arguments)
     }
 
     program += arguments;
-    m_tmaker.start(program);
-    //m_tmaker.waitForStarted();
-    m_tmaker.waitForFinished();
-#endif
+    qDebug() << __FILE__ << __LINE__ << program;
+
+    if (!block)
+    {
+        m_tmaker.start(program);
+        //m_tmaker.waitForStarted();
+        m_tmaker.waitForFinished();
+    }
+    else
+    {
+        QProcess::execute(program);
+    }
 }

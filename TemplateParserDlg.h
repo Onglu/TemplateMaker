@@ -40,16 +40,16 @@ public:
     }
 
 protected:
-    void run()
-    {
-        QString program(MAKER_NAME /*"G:\\Projects\\Qt\\GitHub\\tmaker.exe"*/);
-        program += m_encrypt ? QString(" -e ") : QString(" -d ");
-        program.append(m_arg);
-        QProcess::execute(program);
-        emit finished();
-        //wait();
-        exit();
-    }
+    void run();
+//    {
+//        QString program(MAKER_NAME /*"G:\\Projects\\Qt\\GitHub\\tmaker.exe"*/);
+//        program += m_encrypt ? QString(" -e ") : QString(" -d ");
+//        program.append(m_arg);
+//        QProcess::execute(program);
+//        emit finished();
+//        //wait();
+//        exit();
+//    }
 
 private:
     bool m_encrypt;
@@ -78,7 +78,7 @@ public:
                   ZipUsageDecrypt
                  };
 
-    void useZip(ZipUsage usage, const QString &arguments);
+    static void useZip(ZipUsage usage, const QString &arguments, bool block = false);
 
 signals:
     
@@ -131,13 +131,7 @@ private slots:
 
     void ok();
 
-    void make()
-    {
-        if (!m_finished)
-        {
-            m_finished = true;
-        }
-    }
+    void make();
 
     void processFinished(int, QProcess::ExitStatus);
 
@@ -161,7 +155,7 @@ private:
     QSize m_bkSize;
     int m_landscapeCount, m_portraitCount;
 
-    QProcess m_tmaker;
+    static QProcess m_tmaker;
     PsdParserThread m_parser;
     CryptThread m_maker;
     QTimer m_timer;
