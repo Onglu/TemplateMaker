@@ -138,28 +138,33 @@ private slots:
     void on_tmplToolButton_clicked();
 
 private:
+    void setTag(int type, bool checked, const QString &name = QString());
+
     void addTag(const QCheckBox *check);
 
     bool deleteDir(const QString &dirName, bool delSelf = true);
 
-    void moveTo(QString &fileName, QString dirName, bool overwrite = true);
+    const QString &mkTempDir(bool fullPath = true);
+
+    bool moveTo(QString &fileName, QString dirName, bool overwrite = true);
 
     void change(void);
 
+    static void redirect(int line, const QString &message);
+
     Ui::TemplateParserDlg *ui;
 
-    QVariantMap m_xcmb, m_tagsMap;
-    QString m_dirName, m_psdFile, m_psdPic, m_pkgFile, m_tmpDir, m_tmpFile;
+    QVariantMap m_xcmb, m_tags;
+    QString m_dirName, m_psdPic, m_pkgFile, m_tmpDir, m_tmpFile;
 
     PSD_LAYERS_INFO *m_pInfo;
     QSize m_bkSize;
-    int m_landscapeCount, m_portraitCount;
 
     static QProcess m_tmaker;
     PsdParserThread m_parser;
     CryptThread m_maker;
     QTimer m_timer;
-    bool m_finished, m_make;
+    bool m_finished, m_make, m_opened, m_changed;
     ZipUsage m_usage;
 };
 
