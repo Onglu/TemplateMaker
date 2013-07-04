@@ -33,3 +33,6 @@ CONFIG(release, debug|release)
 {
     LIBS += -L./release -lpsdparser
 }
+
+OTHER_FILES += \
+    README.md

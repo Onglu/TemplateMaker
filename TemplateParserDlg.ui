@@ -181,7 +181,7 @@
          <enum>QFrame::NoFrame</enum>
         </property>
         <property name="text">
-         <string>注：以下模板参数除风格和模板名称以外，均为必填项！</string>
+         <string>注：以下模板参数除风格和模板名称以外，其余均为必填项！</string>
         </property>
        </widget>
       </item>

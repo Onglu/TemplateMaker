@@ -6,6 +6,7 @@
 #include <QProcess>
 #include <QThread>
 #include <QTimer>
+#include <QFile>
 #include "psdparser.h"
 
 #define MAKER_NAME  "tmaker.exe"
@@ -123,6 +124,8 @@ private slots:
 
     void on_psdToolButton_clicked();
 
+    void on_tmplToolButton_clicked();
+
     void on_browsePushButton_clicked();
 
     void on_savePushButton_clicked();
@@ -135,27 +138,35 @@ private slots:
 
     void processFinished(int, QProcess::ExitStatus);
 
-    void on_tmplToolButton_clicked();
+    void selectType(){m_changed = true;}
+
+    void on_nameLineEdit_textChanged(const QString &arg1);
 
 private:
     void setTag(int type, bool checked, const QString &name = QString());
 
     void addTag(const QCheckBox *check);
 
+    void updateWnd(void);
+
     bool deleteDir(const QString &dirName, bool delSelf = true);
 
-    const QString &mkTempDir(bool fullPath = true);
+    void mkTempDir(void);
 
     bool moveTo(QString &fileName, QString dirName, bool overwrite = true);
 
     void change(void);
+
+    void lock(void);
+
+    void unlock(void);
 
     static void redirect(int line, const QString &message);
 
     Ui::TemplateParserDlg *ui;
 
     QVariantMap m_xcmb, m_tags;
-    QString m_dirName, m_psdPic, m_pkgFile, m_tmpDir, m_tmpFile;
+    QString m_dirName, m_picFile, m_pkgFile, m_pkgName, m_tmpDir, m_tmpFile, m_wndTitle;
 
     PSD_LAYERS_INFO *m_pInfo;
     QSize m_bkSize;
@@ -164,8 +175,11 @@ private:
     PsdParserThread m_parser;
     CryptThread m_maker;
     QTimer m_timer;
+
+    FILE *m_pkg, *m_pic;
+
     bool m_finished, m_make, m_opened, m_changed;
-    ZipUsage m_usage;
+    static ZipUsage m_usage;
 };
 
 #endif // TEMPLATEPARSERDLG_H

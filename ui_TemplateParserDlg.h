@@ -1,7 +1,7 @@
 /********************************************************************************
 ** Form generated from reading UI file 'TemplateParserDlg.ui'
 **
-** Created: Tue Jun 18 18:01:20 2013
+** Created: Wed Jun 19 13:43:40 2013
 **      by: Qt User Interface Compiler version 4.8.4
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
@@ -543,7 +543,7 @@ public:
         tmplToolButton->setText(QApplication::translate("TemplateParserDlg", "\346\211\223\345\274\200\346\250\241\346\235\277", 0, QApplication::UnicodeUTF8));
         pictureLabel->setText(QApplication::translate("TemplateParserDlg", "\346\225\210\346\236\234\351\242\204\350\247\210\345\233\276", 0, QApplication::UnicodeUTF8));
         sizeLabel->setText(QApplication::translate("TemplateParserDlg", "\346\250\241\346\235\277\345\244\247\345\260\217\357\274\2320x0", 0, QApplication::UnicodeUTF8));
-        noteLabel->setText(QApplication::translate("TemplateParserDlg", "\346\263\250\357\274\232\344\273\245\344\270\213\346\250\241\346\235\277\345\217\202\346\225\260\351\231\244\351\243\216\346\240\274\345\222\214\346\250\241\346\235\277\345\220\215\347\247\260\344\273\245\345\244\226\357\274\214\345\235\207\344\270\272\345\277\205\345\241\253\351\241\271\357\274\201", 0, QApplication::UnicodeUTF8));
+        noteLabel->setText(QApplication::translate("TemplateParserDlg", "\346\263\250\357\274\232\344\273\245\344\270\213\346\250\241\346\235\277\345\217\202\346\225\260\351\231\244\351\243\216\346\240\274\345\222\214\346\250\241\346\235\277\345\220\215\347\247\260\344\273\245\345\244\226\357\274\214\345\205\266\344\275\231\345\235\207\344\270\272\345\277\205\345\241\253\351\241\271\357\274\201", 0, QApplication::UnicodeUTF8));
         groupBox->setTitle(QApplication::translate("TemplateParserDlg", "\346\250\241\346\235\277\347\261\273\345\236\213", 0, QApplication::UnicodeUTF8));
         wpCoverRadioButton->setText(QApplication::translate("TemplateParserDlg", "\346\211\213\346\234\272\345\260\201\351\235\242 Cover", 0, QApplication::UnicodeUTF8));
         wpPageRadioButton->setText(QApplication::translate("TemplateParserDlg", "\346\211\213\346\234\272\345\206\205\351\241\265 Page", 0, QApplication::UnicodeUTF8));

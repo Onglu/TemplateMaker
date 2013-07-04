@@ -8,27 +8,35 @@
 #include <QDateTime>
 #include <QMessageBox>
 
+#define CHANGED_SUFFIX  " *"
+#define TEMP_FOLDER     "tlpt"
 #define TEMP_FILE       "/DDECF6B7F103CFC11B2.png"
+#define PREVIEW_PICTURE "preview.png"
 #define PKG_FMT         ".xcmb"
 #define PKG_PASSWORD    "123123"
+#define PKG_LEN_FIXED   21
 #define PKG_ENCRYPT     0
 #define LOG_TRACE       0
 
 using namespace QtJson;
 
 QProcess TemplateParserDlg::m_tmaker;
+TemplateParserDlg::ZipUsage TemplateParserDlg::m_usage = TemplateParserDlg::ZipUsageCompress;
 
 TemplateParserDlg::TemplateParserDlg(QWidget *parent) :
     QDialog(parent, Qt::WindowMinimizeButtonHint | Qt::WindowMaximizeButtonHint),
     ui(new Ui::TemplateParserDlg),
     m_pInfo(NULL),
+    m_pkg(NULL),
+    m_pic(NULL),
     m_finished(false),
     m_make(false),
     m_opened(false),
-    m_changed(false),
-    m_usage(ZipUsageCompress)
+    m_changed(false)
 {
     ui->setupUi(this);
+
+    m_wndTitle = windowTitle();
 
     //ui->tmplToolButton->setEnabled(false);
     ui->frame->setEnabled(false);
@@ -42,6 +50,9 @@ TemplateParserDlg::TemplateParserDlg(QWidget *parent) :
         m_dirName = QDir::toNativeSeparators(QDir::homePath()) + "\\";
     }
 
+    connect(ui->wpCoverRadioButton, SIGNAL(clicked()), SLOT(selectType()));
+    connect(ui->wpPageRadioButton, SIGNAL(clicked()), SLOT(selectType()));
+
     connect(&m_timer, SIGNAL(timeout()), SLOT(end()));
     connect(&m_parser, SIGNAL(finished()), SLOT(ok()), Qt::BlockingQueuedConnection);
 
@@ -51,11 +62,15 @@ TemplateParserDlg::TemplateParserDlg(QWidget *parent) :
 
     connect(&m_tmaker, SIGNAL(finished(int,QProcess::ExitStatus)), SLOT(processFinished(int,QProcess::ExitStatus)));
 
+#if LOG_TRACE
     QFile file(QDir::tempPath() + "/tlpt/.message.log");
     if (file.open(QIODevice::WriteOnly))
     {
         file.close();
     }
+#endif
+
+    //QFile::copy("C:\\Users\\Onglu\\Desktop\\test\\branch.png", "G:\\Images\\PSD\\branch.png");
 }
 
 TemplateParserDlg::~TemplateParserDlg()
@@ -73,7 +88,7 @@ TemplateParserDlg::~TemplateParserDlg()
 
     psd_release(m_pInfo);
 
-    deleteDir(m_tmpDir);
+    deleteDir(tr("%1/%2").arg(QDir::tempPath()).arg(TEMP_FOLDER), false);
 
     if (QFile::exists(m_tmpFile))
     {
@@ -81,7 +96,7 @@ TemplateParserDlg::~TemplateParserDlg()
         QFile::remove(m_tmpFile);
     }
 
-    m_tmpFile.clear();
+    unlock();
 
     delete ui;
 }
@@ -123,7 +138,6 @@ bool TemplateParserDlg::deleteDir(const QString &dirName, bool delSelf)
         QFileInfo fi(filePath);
         if (fi.isFile() || fi.isSymLink())
         {
-            redirect(__LINE__, filePath);
             QFile::setPermissions(filePath, QFile::WriteOwner);
             if (!QFile::remove(filePath))
             {
@@ -132,7 +146,7 @@ bool TemplateParserDlg::deleteDir(const QString &dirName, bool delSelf)
         }
         else if (fi.isDir())
         {
-            if (!deleteDir(filePath));
+            if (!deleteDir(filePath))
             {
                 error = true;
             }
@@ -148,11 +162,11 @@ bool TemplateParserDlg::deleteDir(const QString &dirName, bool delSelf)
     return error;
 }
 
-inline const QString &TemplateParserDlg::mkTempDir(bool fullPath)
+inline void TemplateParserDlg::mkTempDir()
 {
     if (!m_xcmb.contains("id"))
     {
-        return "";
+        return;
     }
 
     QString tmpDir(QDir::tempPath() + "/tlpt"), id = m_xcmb["id"].toString();
@@ -165,8 +179,6 @@ inline const QString &TemplateParserDlg::mkTempDir(bool fullPath)
 
     dir.mkdir(id);
     m_tmpDir = QDir::toNativeSeparators(QString("%1/%2/").arg(tmpDir).arg(id));
-
-    return (fullPath ? m_tmpDir : id);
 }
 
 bool TemplateParserDlg::moveTo(QString &fileName, QString dirName, bool overwrite)
@@ -253,13 +265,52 @@ void TemplateParserDlg::change()
             QFile::remove(m_tmpFile);
         }
         m_tmpFile.clear();
-        QMessageBox::information(this, tr("保存成功"), tr("相册模板包已经保存成功！"), tr("确定"));
+
+        setWindowTitle(tr("%1 - %2").arg(m_wndTitle).arg(m_pkgFile));
+
+        if (QMessageBox::AcceptRole == QMessageBox::information(this, tr("保存成功"), tr("相册模板包已经保存成功！"), tr("确定")))
+        {
+            qDebug() << __FILE__ << __LINE__ << m_pkgFile << m_picFile;
+            lock();
+        }
     }
     else
     {
         useZip(ZipUsageRead, m_pkgFile + " page.dat");
     }
 #endif
+}
+
+inline void TemplateParserDlg::lock()
+{
+    if (m_pkg)
+    {
+        fclose(m_pkg);
+    }
+
+    m_pkg = fopen(m_pkgFile.toStdString().c_str(), "rb");
+
+    if (m_pic)
+    {
+        fclose(m_pic);
+    }
+
+    m_pic = fopen(m_picFile.toStdString().c_str(), "rb");
+}
+
+void TemplateParserDlg::unlock()
+{
+    if (m_pkg)
+    {
+        fclose(m_pkg);
+        m_pkg = NULL;
+    }
+
+    if (m_pic)
+    {
+        fclose(m_pic);
+        m_pic = NULL;
+    }
 }
 
 void TemplateParserDlg::make()
@@ -301,8 +352,6 @@ void CryptThread::run()
                               m_arg,
                               true);
     emit finished();
-    //wait();
-    //exit();
 }
 
 void TemplateParserDlg::processFinished(int ret, QProcess::ExitStatus exitStatus)
@@ -321,14 +370,14 @@ void TemplateParserDlg::processFinished(int ret, QProcess::ExitStatus exitStatus
 
         if (content.startsWith("compress:"))
         {
-            moveTo(m_psdPic, m_tmpDir);
+            moveTo(m_picFile, m_tmpDir);
             deleteDir(content.mid(9));
+            qDebug() << __FILE__ << __LINE__ << m_tmpDir << content.mid(9);
         }
 
-        if (ZipUsageAppend == m_usage && !m_tmpFile.isEmpty())
+        if (ZipUsageAppend == m_usage && !m_pkgFile.isEmpty())
         {
-            qDebug() << __FILE__ << __LINE__ << m_tmpFile;
-            //access();
+            qDebug() << __FILE__ << __LINE__ << m_pkgFile;
         }
 
         if (content.startsWith("data:"))
@@ -365,27 +414,31 @@ void TemplateParserDlg::processFinished(int ret, QProcess::ExitStatus exitStatus
                 QString type = data["type"].toString();
                 //qDebug() << __FILE__ << __LINE__ << name << ":" << type;
 
-                if (tr("种类") == type)
+                if (tr("风格") != type)
                 {
-                    setTag(1, true, name);
+                    if (tr("种类") == type)
+                    {
+                        setTag(1, true, name);
+                    }
+                    else if (tr("版式") == type)
+                    {
+                        setTag(2, true, name);
+                    }
+                    else if (tr("色系") == type)
+                    {
+                        setTag(3, true, name);
+                    }
+
+                    m_tags.insert(name, type);
                 }
-                else if (tr("版式") == type)
-                {
-                    setTag(2, true, name);
-                }
-                else if (tr("色系") == type)
-                {
-                    setTag(3, true, name);
-                }
-                else if (tr("风格") == type)
+                else
                 {
                     ui->styleLineEdit->setText(name);
                 }
             }
 
-            QString psdPic = QString("%1.psd.png").arg(m_xcmb["name"].toString());
-            useZip(ZipUsageRead, m_pkgFile + " " + psdPic);
-
+            //useZip(ZipUsageRead, m_pkgFile + " " + m_xcmb["name"].toString() + ".jpg");
+            useZip(ZipUsageRead, m_pkgFile + " preview.png");
             #endif
         }
 
@@ -419,7 +472,15 @@ void TemplateParserDlg::on_psdToolButton_clicked()
     deleteDir(m_tmpDir);
     m_tmpDir.clear();
 
+    m_pkgFile.clear();
+    m_pkgName.clear();
+
+    m_xcmb.clear();
+    m_tags.clear();
+
     fileName = QDir::toNativeSeparators(fileName);
+    setWindowTitle(tr("%1 - %2").arg(m_wndTitle).arg(fileName));
+
     m_dirName = fileName.left(fileName.lastIndexOf(QDir::separator()) + 1);
     QSettings settings("Jizhiyou", "TemplateParser");
     settings.setValue("dir_name", m_dirName);
@@ -446,11 +507,6 @@ void TemplateParserDlg::on_psdToolButton_clicked()
         strcpy(m_pInfo->layers[i].lid, uuid.toStdString().c_str());
     }
 
-    if (!m_xcmb.isEmpty())
-    {
-        m_xcmb.clear();
-    }
-
     m_xcmb.insert("id", QUuid::createUuid().toString().mid(1, 36));
     m_xcmb.insert("ver", "1.0");
     m_xcmb.insert("backgroundColor", "#FFFFFFFF");
@@ -468,16 +524,28 @@ void TemplateParserDlg::on_psdToolButton_clicked()
 
     ui->psdToolButton->setEnabled(false);
     ui->tmplToolButton->setEnabled(false);
+    ui->wpCoverRadioButton->setChecked(false);
+    ui->wpPageRadioButton->setChecked(false);
 
     ui->frame->setEnabled(false);
     ui->progressBar->setVisible(true);
     ui->progressBar->setValue(0);
 
+    ui->pictureLabel->clear();
+    ui->sizeLabel->setText(tr("模板大小：0x0"));
+
+    ui->styleLineEdit->clear();
+    ui->nameLineEdit->clear();
+
+    setTag(1, false);
+    setTag(2, false);
+    setTag(3, false);
+
     m_changed = true;
     m_finished = m_make = false;
     m_parser.initLayersInfo(m_pInfo);
     m_parser.start();
-    m_timer.start(40);
+    m_timer.start(60);
 }
 
 void TemplateParserDlg::on_tmplToolButton_clicked()
@@ -494,10 +562,33 @@ void TemplateParserDlg::on_tmplToolButton_clicked()
         return;
     }
 
-    m_dirName = fileName.left(fileName.lastIndexOf(QDir::separator()) + 1);
+    setWindowTitle(tr("%1 - %2").arg(m_wndTitle).arg(fileName));
+
+    QString filePath = fileName.left(fileName.lastIndexOf(QDir::separator()));
+    ui->pathLineEdit->setText(filePath);
+    m_dirName = filePath.append(QDir::separator());
+
+    QString name = fileName.mid(m_dirName.length(), fileName.length() - m_dirName.length() - strlen(PKG_FMT));
+    if (PKG_LEN_FIXED < name.length())
+    {
+        m_pkgName = name.right(name.length() - PKG_LEN_FIXED);
+    }
+    else
+    {
+        m_pkgName.clear();
+    }
+    ui->nameLineEdit->setText(m_pkgName);
+
     m_pkgFile = fileName;
+    int pos = fileName.lastIndexOf(PKG_FMT, -1, Qt::CaseInsensitive);
+    if (-1 != pos)
+    {
+        m_picFile = fileName.replace(pos, strlen(PKG_FMT), ".png");
+    }
+
     m_changed = m_make = m_opened = true;
     m_xcmb.clear();
+    m_tags.clear();
 
     ui->psdToolButton->setEnabled(false);
     ui->tmplToolButton->setEnabled(false);
@@ -583,11 +674,12 @@ void TemplateParserDlg::ok()
 
     if (-1 != pos)
     {
-        QString tmplDir = file.replace(pos, 4, "_png");
-        m_psdPic = QString("%1\\%2.psd.png").arg(tmplDir).arg(m_xcmb["name"].toString());
+        QString tmplDir = file.replace(pos, 4, "_png"), tmplName = m_xcmb["name"].toString();
+        tmplDir.append("\\");
+        m_picFile = QString("%1%2.psd.png").arg(tmplDir).arg(tmplName);
 
-        QString tmpFolder = mkTempDir(false);
-        m_pkgFile = QString("%1%2%3").arg(m_tmpDir).arg(tmpFolder).arg(PKG_FMT);
+        mkTempDir();
+        m_pkgFile = QString("%1%2%3").arg(m_tmpDir).arg(tmplName).arg(PKG_FMT);
         redirect(__LINE__, m_pkgFile);
 
         QVariantList list;
@@ -615,9 +707,17 @@ void TemplateParserDlg::ok()
                 layer.insert("maskLayer", m_pInfo->layers[i].mid);
             }
 
+            QString name = tmplDir + QString("%1.png").arg(m_pInfo->layers[i].lid);
+            QImage img(name);
+
             if (m_pInfo->layers[i].type)
             {
-                QString name = file + QString("\\%1.png").arg(m_pInfo->layers[i].lid);
+                if ((int)m_pInfo->layers[i].angle)
+                {
+                    img = img.transformed(QTransform().rotate(-1 * m_pInfo->layers[i].angle));
+                    m_pInfo->layers[i].actual.width = img.width();
+                    m_pInfo->layers[i].actual.height = img.height();
+                }
 
                 if (LT_Photo == m_pInfo->layers[i].type)
                 {
@@ -629,35 +729,33 @@ void TemplateParserDlg::ok()
                     {
                         portraitCount++;
                     }
+
+                    QFile::remove(name);
+                    pos = name.lastIndexOf("png", -1, Qt::CaseInsensitive);
+                    name.replace(pos, 3, "jpg");
+                    img.save(name);
+                    //qDebug() << __FILE__ << __LINE__ << name;
                 }
 
                 if (LT_Mask == m_pInfo->layers[i].type && QString(m_pInfo->layers[i].name).contains("lmask", Qt::CaseInsensitive))
                 {
-                    QImage img(name);
                     QVector<QRgb> rgbVector = img.colorTable();
-
                     for (int i = 0; i < rgbVector.size(); ++i)
                     {
                         QColor clr(rgbVector.at(i));
                         clr.setAlpha((clr.red() + clr.blue() + clr.green()) / 3);
                         img.setColor(i, clr.rgba());
                     }
-
-                    img.save(name);
-                }
-
-                if ((int)m_pInfo->layers[i].angle)
-                {
-                    QImage img(name);
-                    img.transformed(QTransform().rotate(-1 * m_pInfo->layers[i].angle)).save(name);
-
-                    QPixmap pix(name);
-                    m_pInfo->layers[i].actual.width = pix.width();
-                    m_pInfo->layers[i].actual.height = pix.height();
                 }
             }
 
-            //qDebug() << i << m_pInfo->layers[i].name << m_pInfo->layers[i].lid << m_pInfo->layers[i].opacity;
+            if (name.endsWith("png"))
+            {
+                img.save(name, "png", 0);
+            }
+
+            //qDebug() << __FILE__ << __LINE__ << name;
+            //qDebug() << __FILE__ << __LINE__ << m_pInfo->layers[i].type << m_pInfo->layers[i].name << m_pInfo->layers[i].lid;
 
             QVariantMap frame;
             frame.insert("width", m_pInfo->layers[i].actual.width);
@@ -672,10 +770,14 @@ void TemplateParserDlg::ok()
         m_xcmb.insert("landscapeCount", landscapeCount);
         m_xcmb.insert("portraitCount", portraitCount);
 
-        QPixmap pix(m_psdPic);
+        qDebug() << __FILE__ << __LINE__ << m_picFile << tmplDir + PREVIEW_PICTURE;
+        QPixmap pix(m_picFile);
         if (!pix.isNull())
         {
             ui->pictureLabel->setPixmap(pix.scaled(ui->pictureLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            QString picFile = m_picFile;
+            m_picFile = tmplDir + PREVIEW_PICTURE;
+            QFile::rename(picFile, m_picFile);
         }
 
         if (list.size())
@@ -851,9 +953,20 @@ inline void TemplateParserDlg::addTag(const QCheckBox *cb)
         m_tags.remove(name);
     }
 
+    updateWnd();
+}
+
+inline void TemplateParserDlg::updateWnd()
+{
     if (!m_changed)
     {
         m_changed = true;
+    }
+
+    QString title = windowTitle();
+    if (CHANGED_SUFFIX != title.right(2))
+    {
+        setWindowTitle(title + CHANGED_SUFFIX);
     }
 }
 
@@ -952,6 +1065,14 @@ void TemplateParserDlg::on_colorPurpleCheckBox_clicked()
     addTag(ui->colorPurpleCheckBox);
 }
 
+void TemplateParserDlg::on_nameLineEdit_textChanged(const QString &arg1)
+{
+    if (m_pkgName != arg1)
+    {
+        updateWnd();
+    }
+}
+
 void TemplateParserDlg::on_browsePushButton_clicked()
 {
     m_dirName = QFileDialog::getExistingDirectory(this, tr("选择文件夹"), m_dirName);
@@ -961,11 +1082,10 @@ void TemplateParserDlg::on_browsePushButton_clicked()
     }
 
     ui->pathLineEdit->setText(m_dirName);
-    m_dirName.append('\\');
+    m_dirName.append(QDir::separator());
 
     QSettings settings("Jizhiyou", "TemplateParser");
     settings.setValue("dir_name", m_dirName);
-    qDebug() << __FILE__ << __LINE__ << m_dirName;
 }
 
 void TemplateParserDlg::on_savePushButton_clicked()
@@ -1005,23 +1125,22 @@ void TemplateParserDlg::on_savePushButton_clicked()
         return;
     }
 
-    if (ui->pathLineEdit->text().isEmpty())
+    QString savePath = ui->pathLineEdit->text();
+    if (savePath.isEmpty())
     {
-        if (QMessageBox::RejectRole == QMessageBox::question(this,
+        if (QMessageBox::AcceptRole == QMessageBox::question(this,
                                                              tr("无效路径"),
                                                              tr("本地目录不能为空，请点击确定按钮进行选择，点击取消按钮则放弃本次操作。"),
                                                              tr("确定"),
                                                              tr("取消")))
         {
-            return;
+            on_browsePushButton_clicked();
         }
 
-        on_browsePushButton_clicked();
-        if (m_dirName.isEmpty())
-        {
-            return;
-        }
+        return;
     }
+
+    savePath.append(QDir::separator());
 
     QVariantList tagsList;
     QVariantMap::const_iterator iter = m_tags.constBegin();
@@ -1046,8 +1165,21 @@ void TemplateParserDlg::on_savePushButton_clicked()
 
     m_xcmb.insert("tags", tagsList);
 
+    if (0 == m_xcmb["landscapeCount"].toInt() + m_xcmb["portraitCount"].toInt() &&
+        QMessageBox::RejectRole == QMessageBox::question(this,
+                                                         tr("无效路径"),
+                                                         tr("该模板中未发现类型为照片的图层，请检查PSD文件中照片图层的命名格式是否\n符合“名称+@photo”规范？若要继续生成，请点击确定按钮，否则点击取消按钮放弃本次操作。"),
+                                                         tr("确定"),
+                                                         tr("取消")))
+    {
+        return;
+    }
+
     int cover = ui->wpCoverRadioButton->isChecked() ? 1 : 0;
     m_xcmb.insert("pagetype", cover);
+
+    QString name = ui->nameLineEdit->text();
+    m_xcmb.insert("name", name);
 
     m_tmpFile = m_tmpDir + "page.dat";
     QFile jf(m_tmpFile);
@@ -1060,47 +1192,63 @@ void TemplateParserDlg::on_savePushButton_clicked()
     jf.write(result);
     jf.close();
 
-    qDebug() << __FILE__ << __LINE__ << m_tmpFile;
+    //qDebug() << __FILE__ << __LINE__ << m_tmpFile;
 
     int count = m_xcmb["landscapeCount"].toInt() + m_xcmb["portraitCount"].toInt();
     QDateTime dt = QDateTime::currentDateTime();
     QString tmplName = QString("MP_%1_P%2_%3_").arg(cover ? 'C' : 'P').arg(count).arg(dt.toString("yyyyMMddhhmm"));
-    QString name = ui->nameLineEdit->text();
     if (!name.isEmpty())
     {
         tmplName += name;
     }
 
-    QString pkgFile = QString("%1%2%3").arg(m_dirName).arg(tmplName).arg(PKG_FMT);
+    QString pkgFile = QString("%1%2%3").arg(savePath).arg(tmplName).arg(PKG_FMT);
     QFile file(pkgFile);
 
-    //qDebug() << __FILE__ << __LINE__ << m_dirName << tmplName << m_pkgFile << pkgFile;
-    redirect(__LINE__, m_dirName + ", " + tmplName + ", " + m_pkgFile + ", " + pkgFile);
+    redirect(__LINE__, savePath + ", " + tmplName + ", " + m_pkgFile + ", " + pkgFile);
 
     if (file.exists())
     {
         QMessageBox::warning(this,
                              tr("保存失败"),
-                             tr("目录\"%1\"下已经存在一个同名的相册模板\"%2\"，请更名后再重新进行保存！").arg(m_dirName).arg(tmplName),
+                             tr("目录下已经存在一个同名的相册模板\"%2\"，请更名后再进行保存！").arg(savePath).arg(tmplName),
                              tr("确定"));
         return;
     }
 
-    //m_pkgFile = QDir::toNativeSeparators(m_pkgFile);
+    unlock();
 
-    if (moveTo(m_psdPic, m_dirName))
+    QString picFile = tr("%1%2.png").arg(savePath).arg(tmplName);
+    qDebug() << __FILE__ << __LINE__ << m_picFile << picFile;
+    //moveTo(m_picFile, savePath);
+    //QFile::rename(m_picFile, picFile);
+
+    if (QFile::exists(m_picFile))
     {
-        qDebug() << __FILE__ << __LINE__ << m_psdPic << m_dirName + tmplName;
-        QFile::rename(m_psdPic, m_dirName + tmplName + ".png");
+        QFile::rename(m_picFile, picFile);
+    }
+    else
+    {
+        QFile::copy(m_picFile, picFile);
     }
 
-    moveTo(m_pkgFile, m_dirName);
-    QFile::rename(m_pkgFile, pkgFile);
+    m_picFile = picFile;
+
+    //moveTo(m_pkgFile, savePath);
+    //QFile::rename(m_pkgFile, pkgFile);
+
+    if (QFile::exists(m_pkgFile))
+    {
+        QFile::rename(m_pkgFile, pkgFile);
+    }
+    else
+    {
+        QFile::copy(m_pkgFile, pkgFile);
+    }
+
     m_pkgFile = pkgFile;
 
     m_changed = false;
-
-    //qDebug() << __FILE__ << __LINE__ << m_pkgFile;
     redirect(__LINE__, m_pkgFile);
 
 #if PKG_ENCRYPT
@@ -1122,7 +1270,7 @@ void TemplateParserDlg::useZip(ZipUsage usage, const QString &arguments, bool bl
 
     QString program(MAKER_NAME);
     //QString program = QDir::toNativeSeparators(QCoreApplication::applicationDirPath() + MAKER_NAME);
-    //m_usage = usage;
+    m_usage = usage;
 
     switch (usage)
     {
@@ -1155,13 +1303,11 @@ void TemplateParserDlg::useZip(ZipUsage usage, const QString &arguments, bool bl
     }
 
     program += arguments;
-    qDebug() << __FILE__ << __LINE__ << program;
     redirect(__LINE__, program);
 
     if (!block)
     {
         m_tmaker.start(program);
-        //m_tmaker.waitForStarted();
         m_tmaker.waitForFinished();
     }
     else
@@ -1169,3 +1315,5 @@ void TemplateParserDlg::useZip(ZipUsage usage, const QString &arguments, bool bl
         m_tmaker.execute(program);
     }
 }
+
+
