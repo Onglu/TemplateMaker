@@ -43,7 +43,7 @@ public:
 protected:
     void run();
 //    {
-//        QString program(MAKER_NAME /*"G:\\Projects\\Qt\\GitHub\\tmaker.exe"*/);
+//        QString program(MAKER_NAME /*"G:\\Projects\\Qt\\tmaker.exe"*/);
 //        program += m_encrypt ? QString(" -e ") : QString(" -d ");
 //        program.append(m_arg);
 //        QProcess::execute(program);
@@ -81,8 +81,9 @@ public:
 
     static void useZip(ZipUsage usage, const QString &arguments, bool block = false);
 
-signals:
-    
+protected:
+    void closeEvent(QCloseEvent *);
+
 private slots:
     void on_typeChildrenCheckBox_clicked();
 

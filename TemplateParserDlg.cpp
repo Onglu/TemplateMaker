@@ -7,6 +7,7 @@
 #include <QSettings>
 #include <QDateTime>
 #include <QMessageBox>
+#include <QCloseEvent>
 
 #define CHANGED_SUFFIX  " *"
 #define TEMP_FOLDER     "tlpt"
@@ -178,7 +179,7 @@ inline void TemplateParserDlg::mkTempDir()
     }
 
     dir.mkdir(id);
-    m_tmpDir = QDir::toNativeSeparators(QString("%1/%2/").arg(tmpDir).arg(id));
+    m_tmpDir = QDir::toNativeSeparators(tr("%1/%2/").arg(tmpDir).arg(id));
 }
 
 bool TemplateParserDlg::moveTo(QString &fileName, QString dirName, bool overwrite)
@@ -267,17 +268,16 @@ void TemplateParserDlg::change()
         m_tmpFile.clear();
 
         setWindowTitle(tr("%1 - %2").arg(m_wndTitle).arg(m_pkgFile));
+        //qDebug() << __FILE__ << __LINE__ << m_pkgFile << m_picFile;
 
-        if (QMessageBox::AcceptRole == QMessageBox::information(this, tr("保存成功"), tr("相册模板包已经保存成功！"), tr("确定")))
-        {
-            qDebug() << __FILE__ << __LINE__ << m_pkgFile << m_picFile;
-            lock();
-        }
+        QMessageBox::information(this, tr("保存成功"), tr("相册模板包已经保存成功！"), tr("确定"));
     }
     else
     {
         useZip(ZipUsageRead, m_pkgFile + " page.dat");
     }
+
+    lock();
 #endif
 }
 
@@ -298,7 +298,7 @@ inline void TemplateParserDlg::lock()
     m_pic = fopen(m_picFile.toStdString().c_str(), "rb");
 }
 
-void TemplateParserDlg::unlock()
+inline void TemplateParserDlg::unlock()
 {
     if (m_pkg)
     {
@@ -469,6 +469,8 @@ void TemplateParserDlg::on_psdToolButton_clicked()
         return;
     }
 
+    unlock();
+
     deleteDir(m_tmpDir);
     m_tmpDir.clear();
 
@@ -562,6 +564,8 @@ void TemplateParserDlg::on_tmplToolButton_clicked()
         return;
     }
 
+    unlock();
+
     setWindowTitle(tr("%1 - %2").arg(m_wndTitle).arg(fileName));
 
     QString filePath = fileName.left(fileName.lastIndexOf(QDir::separator()));
@@ -586,12 +590,15 @@ void TemplateParserDlg::on_tmplToolButton_clicked()
         m_picFile = fileName.replace(pos, strlen(PKG_FMT), ".png");
     }
 
+    lock();
+
     m_changed = m_make = m_opened = true;
     m_xcmb.clear();
     m_tags.clear();
 
     ui->psdToolButton->setEnabled(false);
     ui->tmplToolButton->setEnabled(false);
+    ui->savePushButton->setEnabled(false);
     ui->wpCoverRadioButton->setChecked(false);
     ui->wpPageRadioButton->setChecked(false);
     ui->styleLineEdit->clear();
@@ -600,7 +607,7 @@ void TemplateParserDlg::on_tmplToolButton_clicked()
     setTag(2, false);
     setTag(3, false);
 
-    change();
+    useZip(ZipUsageRead, m_pkgFile + " page.dat");
 }
 
 void TemplateParserDlg::end()
@@ -676,10 +683,10 @@ void TemplateParserDlg::ok()
     {
         QString tmplDir = file.replace(pos, 4, "_png"), tmplName = m_xcmb["name"].toString();
         tmplDir.append("\\");
-        m_picFile = QString("%1%2.psd.png").arg(tmplDir).arg(tmplName);
+        m_picFile = tr("%1%2.psd.png").arg(tmplDir).arg(tmplName);
 
         mkTempDir();
-        m_pkgFile = QString("%1%2%3").arg(m_tmpDir).arg(tmplName).arg(PKG_FMT);
+        m_pkgFile = tr("%1%2%3").arg(m_tmpDir).arg(tmplName).arg(PKG_FMT);
         redirect(__LINE__, m_pkgFile);
 
         QVariantList list;
@@ -967,7 +974,23 @@ inline void TemplateParserDlg::updateWnd()
     if (CHANGED_SUFFIX != title.right(2))
     {
         setWindowTitle(title + CHANGED_SUFFIX);
+        ui->savePushButton->setEnabled(true);
     }
+}
+
+void TemplateParserDlg::closeEvent(QCloseEvent *event)
+{
+    if (CHANGED_SUFFIX == windowTitle().right(2) &&
+       QMessageBox::AcceptRole == QMessageBox::question(this,
+                                                        tr("保存提示"),
+                                                        tr("当前相册模板包的数据已经被修改，是否要保存这些修改？"),
+                                                        tr("保存"),
+                                                        tr("不保存")))
+    {
+        on_savePushButton_clicked();
+    }
+
+    event->accept();
 }
 
 void TemplateParserDlg::on_typeChildrenCheckBox_clicked()
@@ -1202,7 +1225,7 @@ void TemplateParserDlg::on_savePushButton_clicked()
         tmplName += name;
     }
 
-    QString pkgFile = QString("%1%2%3").arg(savePath).arg(tmplName).arg(PKG_FMT);
+    QString pkgFile = tr("%1%2%3").arg(savePath).arg(tmplName).arg(PKG_FMT);
     QFile file(pkgFile);
 
     redirect(__LINE__, savePath + ", " + tmplName + ", " + m_pkgFile + ", " + pkgFile);
@@ -1220,6 +1243,7 @@ void TemplateParserDlg::on_savePushButton_clicked()
 
     QString picFile = tr("%1%2.png").arg(savePath).arg(tmplName);
     qDebug() << __FILE__ << __LINE__ << m_picFile << picFile;
+
     //moveTo(m_picFile, savePath);
     //QFile::rename(m_picFile, picFile);
 
@@ -1258,7 +1282,21 @@ void TemplateParserDlg::on_savePushButton_clicked()
     }
 #endif
 
-    change();
+    useZip(ZipUsageAppend, m_pkgFile + " " + m_tmpFile, true);
+    if (QFile::exists(m_tmpFile))
+    {
+        QFile::remove(m_tmpFile);
+    }
+    m_tmpFile.clear();
+
+    lock();
+
+    setWindowTitle(tr("%1 - %2").arg(m_wndTitle).arg(m_pkgFile));
+    //qDebug() << __FILE__ << __LINE__ << m_pkgFile << m_picFile;
+
+    ui->savePushButton->setEnabled(false);
+
+    QMessageBox::information(this, tr("保存成功"), tr("相册模板包已经保存成功！"), tr("确定"));
 }
 
 void TemplateParserDlg::useZip(ZipUsage usage, const QString &arguments, bool block)

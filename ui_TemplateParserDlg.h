@@ -1,7 +1,7 @@
 /********************************************************************************
 ** Form generated from reading UI file 'TemplateParserDlg.ui'
 **
-** Created: Wed Jun 19 13:43:40 2013
+** Created: Thu Jul 11 11:33:44 2013
 **      by: Qt User Interface Compiler version 4.8.4
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
@@ -100,7 +100,7 @@ public:
     {
         if (TemplateParserDlg->objectName().isEmpty())
             TemplateParserDlg->setObjectName(QString::fromUtf8("TemplateParserDlg"));
-        TemplateParserDlg->resize(680, 560);
+        TemplateParserDlg->resize(816, 560);
         TemplateParserDlg->setMinimumSize(QSize(680, 560));
         gridLayout_4 = new QGridLayout(TemplateParserDlg);
         gridLayout_4->setSpacing(6);
