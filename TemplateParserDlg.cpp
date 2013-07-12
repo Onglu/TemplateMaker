@@ -258,9 +258,14 @@ void TemplateParserDlg::change()
     m_maker.start();
     m_timer.start(m_make ? 30 : 50);
 #else
+
+    QString args;
+
     if (!m_xcmb.isEmpty())
     {
-        useZip(ZipUsageAppend, m_pkgFile + " " + m_tmpFile, true);
+        //useZip(ZipUsageAppend, m_pkgFile + " " + m_tmpFile, true);
+        useZip(ZipUsageAppend, args2(args, m_pkgFile, m_tmpFile), true);
+
         if (QFile::exists(m_tmpFile))
         {
             QFile::remove(m_tmpFile);
@@ -274,7 +279,8 @@ void TemplateParserDlg::change()
     }
     else
     {
-        useZip(ZipUsageRead, m_pkgFile + " page.dat");
+        //useZip(ZipUsageRead, m_pkgFile + " page.dat");
+        useZip(ZipUsageRead, args2(args, m_pkgFile, "page.dat"));
     }
 
     lock();
@@ -437,8 +443,10 @@ void TemplateParserDlg::processFinished(int ret, QProcess::ExitStatus exitStatus
                 }
             }
 
-            //useZip(ZipUsageRead, m_pkgFile + " " + m_xcmb["name"].toString() + ".jpg");
-            useZip(ZipUsageRead, m_pkgFile + " preview.png");
+            //useZip(ZipUsageRead, m_pkgFile + " preview.png");
+
+            QString args;
+            useZip(ZipUsageRead, args2(args, m_pkgFile, "preview.png"));
             #endif
         }
 
@@ -607,7 +615,10 @@ void TemplateParserDlg::on_tmplToolButton_clicked()
     setTag(2, false);
     setTag(3, false);
 
-    useZip(ZipUsageRead, m_pkgFile + " page.dat");
+    //useZip(ZipUsageRead, m_pkgFile + " page.dat");
+
+    QString args;
+    useZip(ZipUsageRead, args2(args, m_pkgFile, "page.dat"));
 }
 
 void TemplateParserDlg::end()
@@ -789,7 +800,9 @@ void TemplateParserDlg::ok()
 
         if (list.size())
         {
-            useZip(ZipUsageCompress, m_pkgFile + " " + tmplDir);
+            //useZip(ZipUsageCompress, m_pkgFile + " " + tmplDir);
+            QString args;
+            useZip(ZipUsageCompress, args2(args, m_pkgFile, tmplDir));
         }
     }
 
@@ -1282,7 +1295,11 @@ void TemplateParserDlg::on_savePushButton_clicked()
     }
 #endif
 
-    useZip(ZipUsageAppend, m_pkgFile + " " + m_tmpFile, true);
+    //useZip(ZipUsageAppend, m_pkgFile + " " + m_tmpFile, true);
+
+    QString args;
+    useZip(ZipUsageAppend, args2(args, m_pkgFile, m_tmpFile));
+
     if (QFile::exists(m_tmpFile))
     {
         QFile::remove(m_tmpFile);
