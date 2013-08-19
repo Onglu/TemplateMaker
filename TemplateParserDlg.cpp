@@ -263,7 +263,6 @@ void TemplateParserDlg::change()
 
     if (!m_xcmb.isEmpty())
     {
-        //useZip(ZipUsageAppend, m_pkgFile + " " + m_tmpFile, true);
         useZip(ZipUsageAppend, args2(args, m_pkgFile, m_tmpFile), true);
 
         if (QFile::exists(m_tmpFile))
@@ -279,7 +278,6 @@ void TemplateParserDlg::change()
     }
     else
     {
-        //useZip(ZipUsageRead, m_pkgFile + " page.dat");
         useZip(ZipUsageRead, args2(args, m_pkgFile, "page.dat"));
     }
 
@@ -442,8 +440,6 @@ void TemplateParserDlg::processFinished(int ret, QProcess::ExitStatus exitStatus
                     ui->styleLineEdit->setText(name);
                 }
             }
-
-            //useZip(ZipUsageRead, m_pkgFile + " preview.png");
 
             QString args;
             useZip(ZipUsageRead, args2(args, m_pkgFile, "preview.png"));
@@ -615,8 +611,6 @@ void TemplateParserDlg::on_tmplToolButton_clicked()
     setTag(2, false);
     setTag(3, false);
 
-    //useZip(ZipUsageRead, m_pkgFile + " page.dat");
-
     QString args;
     useZip(ZipUsageRead, args2(args, m_pkgFile, "page.dat"));
 }
@@ -717,8 +711,6 @@ void TemplateParserDlg::ok()
             layer.insert("rotation", m_pInfo->layers[i].angle);
             layer.insert("opacity", QString("%1").arg(m_pInfo->layers[i].opacity));
             layer.insert("type", m_pInfo->layers[i].type);
-            uchar orientation = m_pInfo->layers[i].actual.width > m_pInfo->layers[i].actual.height ? 1 : 0;
-            layer.insert("orientation", orientation);
 
             if (strlen(m_pInfo->layers[i].mid))
             {
@@ -733,13 +725,11 @@ void TemplateParserDlg::ok()
                 if ((int)m_pInfo->layers[i].angle)
                 {
                     img = img.transformed(QTransform().rotate(-1 * m_pInfo->layers[i].angle));
-                    m_pInfo->layers[i].actual.width = img.width();
-                    m_pInfo->layers[i].actual.height = img.height();
                 }
 
                 if (LT_Photo == m_pInfo->layers[i].type)
                 {
-                    if (orientation)
+                    if (img.width() > img.height())
                     {
                         landscapeCount++;
                     }
@@ -752,7 +742,7 @@ void TemplateParserDlg::ok()
                     pos = name.lastIndexOf("png", -1, Qt::CaseInsensitive);
                     name.replace(pos, 3, "jpg");
                     img.save(name);
-                    //qDebug() << __FILE__ << __LINE__ << name;
+                    //qDebug() << __FILE__ << __LINE__ << name << m_pInfo->layers[i].angle;
                 }
 
                 if (LT_Mask == m_pInfo->layers[i].type && QString(m_pInfo->layers[i].name).contains("lmask", Qt::CaseInsensitive))
@@ -771,6 +761,10 @@ void TemplateParserDlg::ok()
             {
                 img.save(name, "png", 0);
             }
+
+            m_pInfo->layers[i].actual.width = img.width();
+            m_pInfo->layers[i].actual.height = img.height();
+            layer.insert("orientation", m_pInfo->layers[i].actual.width > m_pInfo->layers[i].actual.height ? 1 : 0);
 
             //qDebug() << __FILE__ << __LINE__ << name;
             //qDebug() << __FILE__ << __LINE__ << m_pInfo->layers[i].type << m_pInfo->layers[i].name << m_pInfo->layers[i].lid;
@@ -800,7 +794,6 @@ void TemplateParserDlg::ok()
 
         if (list.size())
         {
-            //useZip(ZipUsageCompress, m_pkgFile + " " + tmplDir);
             QString args;
             useZip(ZipUsageCompress, args2(args, m_pkgFile, tmplDir));
         }
@@ -1294,8 +1287,6 @@ void TemplateParserDlg::on_savePushButton_clicked()
         m_make = m_opened = false;
     }
 #endif
-
-    //useZip(ZipUsageAppend, m_pkgFile + " " + m_tmpFile, true);
 
     QString args;
     useZip(ZipUsageAppend, args2(args, m_pkgFile, m_tmpFile));
